@@ -153,5 +153,94 @@ const doctorDashboard = async (req, res) => {
     }
 };
 
+// api for doctor profile
+const docProfile = async (req, res) => {
+    try {
+        const docId = req.docId;
+        console.log('Doctor ID from token:', docId);
+        
+        if (!docId) {
+            return res.json({ success: false, message: 'Doctor ID not found in token' });
+        }
 
-export { changeAvailability, doctorList, loginDoctor, appointmentsDoctor, appointmentCompleted, appointmentCancel, doctorDashboard }
+        // Find doctor by ID and exclude password
+        const docData = await doctorModel.findById(docId).select('-password');
+        console.log('Doctor data found:', docData ? 'Yes' : 'No');
+        
+        if (!docData) {
+            return res.json({ success: false, message: 'Doctor profile not found' });
+        }
+
+        // Return successful response with doctor profile data
+        return res.json({ 
+            success: true, 
+            docData: {
+                _id: docData._id,
+                name: docData.name,
+                email: docData.email,
+                image: docData.image,
+                speciality: docData.speciality,
+                degree: docData.degree,
+                experience: docData.experience,
+                about: docData.about,
+                fee: docData.fee,
+                address: docData.address,
+                available: docData.available,
+                date: docData.date
+            }
+        });
+        
+    } catch (error) {
+        console.log('Error in docProfile function:', error);
+        return res.json({ success: false, message: 'Server error: ' + error.message });
+    }
+};
+
+// api to update profile from doctor pannel
+const updateProfile = async (req, res) => {
+    try {
+        console.log('Update profile request received:', req.body)
+        const {name, email, speciality, degree, experience, about, fee, address, available} = req.body
+        const docId = req.docId
+        console.log('Doctor ID:', docId)
+        
+        // If only updating availability, skip validation
+        if (Object.keys(req.body).length === 1 && req.body.hasOwnProperty('available')) {
+            console.log('Updating only availability to:', available)
+            await doctorModel.findByIdAndUpdate(docId, { available })
+            return res.json({ success: true, message: 'Availability updated successfully' })
+        }
+        
+        // Validate required fields for full profile update
+        if (!name || !email || !speciality || !degree || !experience || !about || !fee) {
+            return res.json({ success: false, message: 'All fields are required' })
+        }
+
+        // Check if email is already taken by another doctor
+        const existingDoctor = await doctorModel.findOne({ email, _id: { $ne: docId } })
+        if (existingDoctor) {
+            return res.json({ success: false, message: 'Email already exists' })
+        }
+
+        const updateData = {
+            name,
+            email,
+            speciality,
+            degree,
+            experience,
+            about,
+            fee,
+            address,
+            available
+        }
+
+        await doctorModel.findByIdAndUpdate(docId, updateData)
+        res.json({ success: true, message: 'Profile updated successfully' })
+    } catch (error) {
+        console.log('Error in updateProfile:', error)
+        res.json({ success: false, message: error.message })
+    }
+}
+
+
+export { changeAvailability, doctorList, loginDoctor, appointmentsDoctor, appointmentCompleted, appointmentCancel, doctorDashboard, docProfile, updateProfile }
