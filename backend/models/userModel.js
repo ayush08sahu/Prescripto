@@ -10,6 +10,15 @@ const userSchema = new mongoose.Schema(
     gender: { type: String, default:"Not Selected"},
     dob: { type: String, default:"Not Selected"},
     phone: { type: String, default:"0000000000" },
+    notifications: [
+      {
+        type: { type: String, default: "info" },
+        message: { type: String },
+        appointmentId: { type: String },
+        date: { type: Number, default: Date.now },
+        read: { type: Boolean, default: false },
+      },
+    ],
   });
 
 const userModel =

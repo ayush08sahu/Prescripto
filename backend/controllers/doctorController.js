@@ -2,6 +2,7 @@ import doctorModel from "../models/doctorModel.js"
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 import appointmentModel from "../models/appointmentModel.js"
+import userModel from "../models/userModel.js"
 
 
 
@@ -103,10 +104,44 @@ const appointmentCancel = async (req, res) => {
 
         const appointmentData = await appointmentModel.findById(appointmentId)
         if (appointmentData && appointmentData.docId === docId) {
-            await appointmentModel.findByIdAndUpdate(appointmentId, {canceled: true})
-            return res.json({ success: true, message: 'Appointment marked as cancelled' })
-        }else{
-            return res.json({ success: false, message: 'Cancellation failed' })
+                        // mark appointment canceled
+                        await appointmentModel.findByIdAndUpdate(appointmentId, { canceled: true });
+
+                        // release doctor's booked slot so user and doctor schedules stay in sync
+                        const { slotDate, slotTime } = appointmentData;
+                        const doctorData = await doctorModel.findById(docId);
+                        if (doctorData) {
+                                let slots_booked = doctorData.slots_booked || {};
+                                if (slots_booked[slotDate]) {
+                                        slots_booked[slotDate] = slots_booked[slotDate].filter((e) => e !== slotTime);
+                                        // remove the date key if no slots remain
+                                        if (slots_booked[slotDate].length === 0) {
+                                                delete slots_booked[slotDate];
+                                        }
+                                        await doctorModel.findByIdAndUpdate(docId, { slots_booked });
+                                }
+                        }
+
+                        // notify the user about cancellation
+                        try {
+                            const userId = appointmentData.userId;
+                            if (userId) {
+                                const notification = {
+                                    type: "info",
+                                    message: `Your appointment on ${slotDate} at ${slotTime} has been canceled by the doctor.`,
+                                    appointmentId,
+                                    date: Date.now(),
+                                    read: false,
+                                };
+                                await userModel.findByIdAndUpdate(userId, { $push: { notifications: notification } });
+                            }
+                        } catch (err) {
+                            console.log("Failed to send cancellation notification to user:", err.message);
+                        }
+
+                        return res.json({ success: true, message: 'Appointment marked as cancelled' });
+        } else {
+            return res.json({ success: false, message: 'Cancellation failed' });
         }
         
 

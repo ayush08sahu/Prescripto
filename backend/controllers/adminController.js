@@ -134,7 +134,24 @@ const appointmentCancel = async (req, res) => {
 
     await doctorModel.findByIdAndUpdate(docId, { slots_booked });
 
-    res.json({ success: true, message: "Appointment canceled successfully" });
+        // notify the user about cancellation
+        try {
+            const userId = appointmentData.userId;
+            if (userId) {
+                const notification = {
+                    type: "info",
+                    message: `Your appointment on ${slotDate} at ${slotTime} has been canceled by admin.`,
+                    appointmentId,
+                    date: Date.now(),
+                    read: false,
+                };
+                await userModel.findByIdAndUpdate(userId, { $push: { notifications: notification } });
+            }
+        } catch (err) {
+            console.log("Failed to send cancellation notification to user:", err.message);
+        }
+
+        res.json({ success: true, message: "Appointment canceled successfully" });
   } catch (error) {
     console.log(error);
     res.json({ success: false, message: error.message });
